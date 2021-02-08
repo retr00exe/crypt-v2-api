@@ -20,7 +20,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-var collection *mongo.Collection = helper.ConnectDB()
+var personCollection *mongo.Collection = helper.ConnectDB("my-db", "people")
+var hashCollection *mongo.Collection = helper.ConnectDB("crypt-v2", "hash")
 var host string = "127.0.0.1:8080"
 
 func main() {
@@ -47,16 +48,20 @@ func main() {
 	r.HandleFunc("/api/person", createPerson).Methods("POST")
 	r.HandleFunc("/api/person/{id}", updatePerson).Methods("PUT")
 	r.HandleFunc("/api/person/{id}", deletePerson).Methods("DELETE")
+	r.HandleFunc("/api/hash", getHash).Methods("GET")
+	r.HandleFunc("/api/hash", createHash).Methods("POST")
 	log.Fatal(http.ListenAndServe(host, r))
 }
 
-// @route 	GET /api/person
-// @desc		Get all users
-// @access	Public
+/*
+	@route 	GET /api/person
+	@desc		Get all users
+	@access	Public
+*/
 func getPeople(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("content-type", "application/json")
 	var people []models.Person
-	result, err := collection.Find(context.TODO(), bson.M{})
+	result, err := personCollection.Find(context.TODO(), bson.M{})
 	if err != nil {
 		helper.GetError(err, w)
 		return
@@ -76,32 +81,36 @@ func getPeople(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("GET	/api/person 200 OK!")
 }
 
-// @route 	GET /api/person/{id}
-// @desc		Get specific user
-// @access	Public
+/*
+	@route 	GET /api/person/:id
+	@desc		Get specific user
+	@access	Public
+*/
 func getPerson(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("content-type", "application/json")
 	var person models.Person
 	var params = mux.Vars(r)
 	id, _ := primitive.ObjectIDFromHex(params["id"])
 	filter := bson.M{"_id": id}
-	err := collection.FindOne(context.TODO(), filter).Decode(&person)
+	err := personCollection.FindOne(context.TODO(), filter).Decode(&person)
 	if err != nil {
 		helper.GetError(err, w)
 		return
 	}
 	json.NewEncoder(w).Encode(person)
-	fmt.Println("GET	/api/person/{id} 200 OK!")
+	fmt.Println("GET	/api/person/:id 200 OK!")
 }
 
-// @route 	POST /api/person
-// @desc		Create a user
-// @access	Public
+/*
+	@route 	POST /api/person
+	@desc		Create a user
+	@access	Public
+*/
 func createPerson(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("content-type", "application/json")
 	var person models.Person
 	_ = json.NewDecoder(r.Body).Decode(&person)
-	result, err := collection.InsertOne(context.TODO(), person)
+	result, err := personCollection.InsertOne(context.TODO(), person)
 	if err != nil {
 		helper.GetError(err, w)
 		return
@@ -110,9 +119,11 @@ func createPerson(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("POST	/api/person 200 OK!")
 }
 
-// @route 	PUT /api/person/{id}
-// @desc		Update a user
-// @access	Public
+/*
+	@route 	PUT /api/person/:id
+	@desc		Update a user
+	@access	Public
+*/
 func updatePerson(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("content-type", "application/json")
 	var params = mux.Vars(r)
@@ -126,29 +137,77 @@ func updatePerson(w http.ResponseWriter, r *http.Request) {
 			"lastname":  person.Lastname,
 		},
 	}
-	err := collection.FindOneAndUpdate(context.TODO(), filter, update).Decode(&person)
+	err := personCollection.FindOneAndUpdate(context.TODO(), filter, update).Decode(&person)
 	if err != nil {
 		helper.GetError(err, w)
 		return
 	}
 	person.ID = id
 	json.NewEncoder(w).Encode(person)
-	fmt.Println("PUT	/api/person/{id} 200 OK!")
+	fmt.Println("PUT	/api/person/:id 200 OK!")
 }
 
-// @route 	DELETE /api/person/{id}
-// @desc		Delete a users
-// @access	Public
+/*
+	@route 	DELETE /api/person/:id
+  @desc		Delete a users
+	@access	Public
+*/
 func deletePerson(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("content-type", "application/json")
 	var params = mux.Vars(r)
 	id, err := primitive.ObjectIDFromHex(params["id"])
 	filter := bson.M{"_id": id}
-	deleteResult, err := collection.DeleteOne(context.TODO(), filter)
+	deleteResult, err := personCollection.DeleteOne(context.TODO(), filter)
 	if err != nil {
 		helper.GetError(err, w)
 		return
 	}
 	json.NewEncoder(w).Encode(deleteResult)
-	fmt.Println("DELETE	/api/person/{id} 200 OK!")
+	fmt.Println("DELETE	/api/person/:id 200 OK!")
+}
+
+/*
+	@route 	GET /api/person
+	@desc		Get all users
+	@access	Public
+*/
+func getHash(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("content-type", "application/json")
+	var hashes []models.Hash
+	result, err := hashCollection.Find(context.TODO(), bson.M{})
+	if err != nil {
+		helper.GetError(err, w)
+		return
+	}
+	for result.Next(context.TODO()) {
+		var hash models.Hash
+		err := result.Decode(&hash)
+		if err != nil {
+			log.Fatal(err)
+		}
+		hashes = append(hashes, hash)
+	}
+	if err := result.Err(); err != nil {
+		log.Fatal(err)
+	}
+	json.NewEncoder(w).Encode(hashes)
+	fmt.Println("GET	/api/hash 200 OK!")
+}
+
+/*
+	@route 	POST /api/hash
+	@desc		Create a hash description
+	@access	Public
+*/
+func createHash(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("content-type", "application/json")
+	var hash models.Hash
+	_ = json.NewDecoder(r.Body).Decode(&hash)
+	result, err := personCollection.InsertOne(context.TODO(), hash)
+	if err != nil {
+		helper.GetError(err, w)
+		return
+	}
+	json.NewEncoder(w).Encode(result)
+	fmt.Println("POST	/api/hash 200 OK!")
 }

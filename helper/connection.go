@@ -5,21 +5,27 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // ConnectDB is helper function to connect MongoDB Atlas
-func ConnectDB() *mongo.Collection {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb+srv://retr00exe:system32@backend-cluster.vy2xd.mongodb.net/crypt-v2?retryWrites=true&w=majority"))
+func ConnectDB(db string, col string) *mongo.Collection {
+	err := godotenv.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
-	collection := client.Database("my-db").Collection("people")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(os.Getenv("ATLAS_URI")))
+	if err != nil {
+		log.Fatal(err)
+	}
+	collection := client.Database(db).Collection(col)
 	return collection
 }
 
