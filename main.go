@@ -48,7 +48,7 @@ func main() {
 	r.HandleFunc("/api/person", createPerson).Methods("POST")
 	r.HandleFunc("/api/person/{id}", updatePerson).Methods("PUT")
 	r.HandleFunc("/api/person/{id}", deletePerson).Methods("DELETE")
-	r.HandleFunc("/api/hash", getHash).Methods("GET")
+	r.HandleFunc("/api/hash", getHashes).Methods("GET")
 	r.HandleFunc("/api/hash", createHash).Methods("POST")
 	log.Fatal(http.ListenAndServe(host, r))
 }
@@ -167,11 +167,11 @@ func deletePerson(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-	@route 	GET /api/person
+	@route 	GET /api/hash
 	@desc		Get all users
 	@access	Public
 */
-func getHash(w http.ResponseWriter, r *http.Request) {
+func getHashes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("content-type", "application/json")
 	var hashes []models.Hash
 	result, err := hashCollection.Find(context.TODO(), bson.M{})
@@ -195,6 +195,26 @@ func getHash(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
+	@route 	GET /api/hash/:id
+	@desc		Get specific user
+	@access	Public
+*/
+func getHash(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("content-type", "application/json")
+	var hash models.Hash
+	var params = mux.Vars(r)
+	id, _ := primitive.ObjectIDFromHex(params["id"])
+	filter := bson.M{"_id": id}
+	err := hashCollection.FindOne(context.TODO(), filter).Decode(&hash)
+	if err != nil {
+		helper.GetError(err, w)
+		return
+	}
+	json.NewEncoder(w).Encode(hash)
+	fmt.Println("GET	/api/hash/:id 200 OK!")
+}
+
+/*
 	@route 	POST /api/hash
 	@desc		Create a hash description
 	@access	Public
@@ -210,4 +230,55 @@ func createHash(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(result)
 	fmt.Println("POST	/api/hash 200 OK!")
+}
+
+/*
+	@route	PUT /api/hash/:id
+	@desc		Update a user
+	@access	Public
+*/
+func updateHash(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("content-type", "application/json")
+	var params = mux.Vars(r)
+	id, _ := primitive.ObjectIDFromHex(params["id"])
+	var hash models.Hash
+	filter := bson.M{"_id": id}
+	_ = json.NewDecoder(r.Body).Decode(&hash)
+	update := bson.M{
+		"$set": bson.M{
+			"name":        hash.Name,
+			"digest_size": hash.DigestSize,
+			"block_size":  hash.BlockSize,
+			"rounds":      hash.Rounds,
+			"date":        hash.DatePublished,
+			"designer":    hash.Designer,
+		},
+	}
+	err := hashCollection.FindOneAndUpdate(context.TODO(), filter, update).Decode(&hash)
+	if err != nil {
+		helper.GetError(err, w)
+		return
+	}
+	hash.ID = id
+	json.NewEncoder(w).Encode(hash)
+	fmt.Println("PUT	/api/hash/:id 200 OK!")
+}
+
+/*
+	@route	DELETE /api/hash/:id
+  @desc		Delete a users
+	@access	Public
+*/
+func deleteHash(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("content-type", "application/json")
+	var params = mux.Vars(r)
+	id, err := primitive.ObjectIDFromHex(params["id"])
+	filter := bson.M{"_id": id}
+	deleteResult, err := hashCollection.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		helper.GetError(err, w)
+		return
+	}
+	json.NewEncoder(w).Encode(deleteResult)
+	fmt.Println("DELETE	/api/hash/:id 200 OK!")
 }
